@@ -27,6 +27,7 @@ dashboard-data-engineering/
 Link to dashboard: https://gjeddesedzrnx2vjjwve8s.streamlit.app/    
 
 Link to resources for cost and sell of vehicles: 
+https://www.statcan.gc.ca/en/topics-start/automotive
 https://www150.statcan.gc.ca/n1/daily-quotidien/250815/dq250815d-eng.htm 
 https://www150.statcan.gc.ca/n1/en/catalogue/63-007-X
 https://www.chevrolet.ca/en/suvs/previous-year-trax
