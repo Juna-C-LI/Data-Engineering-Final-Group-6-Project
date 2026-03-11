@@ -1,7 +1,14 @@
 Vehicle Emissions, Demand, and Revenue Dashboard
 
-Link to dashboard: https://gjeddesedzrnx2vjjwve8s.streamlit.app/     
-Link to resources for cost and sell of vehicles: https://www150.statcan.gc.ca/n1/daily-quotidien/250815/dq250815d-eng.htm and https://www150.statcan.gc.ca/n1/en/catalogue/63-007-X
+Link to dashboard: https://gjeddesedzrnx2vjjwve8s.streamlit.app/    
+
+Link to resources for cost and sell of vehicles: 
+https://www150.statcan.gc.ca/n1/daily-quotidien/250815/dq250815d-eng.htm 
+https://www150.statcan.gc.ca/n1/en/catalogue/63-007-X
+https://www.chevrolet.ca/en/suvs/previous-year-trax
+https://thecarboys.ca/best-small-suvs-in-canada/
+https://thecarboys.ca/best-midsize-suvs-canada/
+https://www.devex.com/organizations/statistics-canada-statcan-149189
 
 Folder Structure
 
