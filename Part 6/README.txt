@@ -1,5 +1,29 @@
 Vehicle Emissions, Demand, and Revenue Dashboard
 
+Folder Structure
+
+dashboard-data-engineering/
+│
+├── app.py
+├── build_outputs.py
+├── requirements.txt
+├── CO2 Emissions_Canada(1).csv
+│
+└── dashboard_outputs/
+    ├── cleaned_data.csv
+    ├── emissions_results.csv
+    ├── demand_results.csv
+    ├── revenue_results.csv
+    ├── emissions_sample_predictions.csv
+    ├── demand_sample_predictions.csv
+    ├── revenue_sample_predictions.csv
+    ├── emissions_feature_importance.csv
+    ├── demand_feature_importance.csv
+    ├── revenue_feature_importance.csv
+    ├── scenario_results.csv
+    └── summary_metrics.csv
+
+
 Link to dashboard: https://gjeddesedzrnx2vjjwve8s.streamlit.app/    
 
 Link to resources for cost and sell of vehicles: 
@@ -9,15 +33,6 @@ https://www.chevrolet.ca/en/suvs/previous-year-trax
 https://thecarboys.ca/best-small-suvs-in-canada/
 https://thecarboys.ca/best-midsize-suvs-canada/
 https://www.devex.com/organizations/statistics-canada-statcan-149189
-
-Folder Structure
-
-dashboard-data-engineering/
-│
-├── app.py
-├── build_outputs.py
-├── requirements.txt
-├── CO2 Emissions_Canada(1).csv
 
 Overview
 
