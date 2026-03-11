@@ -1,0 +1,587 @@
+# This github code document includes:
+# 1. Emissions modelling
+# 2. Demand/revenue modelling
+# 3. Scenario simulator
+# 4. Visual outputs for all techniques
+
+
+import os
+import warnings
+warnings.filterwarnings("ignore")
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from sklearn.model_selection import train_test_split, cross_val_score, KFold
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler, PolynomialFeatures
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LinearRegression, RidgeCV, LassoCV
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+
+# load data 
+
+file_path = "CO2 Emissions_Canada(1).csv"
+
+if not os.path.exists(file_path):
+    raise FileNotFoundError(
+        f"Could not find {file_path}. Upload the CSV into Colab first."
+    )
+
+df = pd.read_csv(file_path)
+
+print("Dataset loaded successfully.")
+print("Original shape:", df.shape)
+print("\nOriginal columns:")
+print(df.columns.tolist())
+
+
+# clean data
+
+df = df.drop_duplicates().copy()
+
+required_cols = [
+    "Make",
+    "Model",
+    "Vehicle Class",
+    "Engine Size(L)",
+    "Cylinders",
+    "Transmission",
+    "Fuel Type",
+    "CO2 Emissions(g/km)"
+]
+
+missing_required = [col for col in required_cols if col not in df.columns]
+if missing_required:
+    raise ValueError(f"These required columns are missing from the dataset: {missing_required}")
+
+df = df[required_cols].dropna().copy()
+
+# Consistent key, aligned with professor feedback
+df["vehicle_key"] = (
+    df["Vehicle Class"].astype(str) + "_" +
+    df["Fuel Type"].astype(str) + "_" +
+    df["Transmission"].astype(str) + "_" +
+    pd.cut(
+        df["Engine Size(L)"],
+        bins=[0, 1.5, 2.5, 3.5, 5.0, 10.0],
+        labels=["small", "medium", "large", "xlarge", "performance"]
+    ).astype(str)
+)
+
+print("\nCleaned dataset shape:", df.shape)
+
+
+# demand and revenue targets
+
+
+
+if "Units Sold" in df.columns:
+    df["demand_target"] = df["Units Sold"]
+    print("\nUsing real 'Units Sold' as demand target.")
+else:
+    class_boost = {
+        "COMPACT": 1.20,
+        "MID-SIZE": 1.10,
+        "SUBCOMPACT": 1.05,
+        "SUV - SMALL": 1.15,
+        "SUV - STANDARD": 0.95,
+        "FULL-SIZE": 0.85,
+        "PICKUP TRUCK - SMALL": 0.90,
+        "PICKUP TRUCK - STANDARD": 0.88,
+        "MINIVAN": 0.92,
+        "TWO-SEATER": 0.55,
+        "STATION WAGON - SMALL": 0.95,
+        "STATION WAGON - MID-SIZE": 0.88,
+        "VAN - CARGO": 0.72,
+        "VAN - PASSENGER": 0.78,
+        "MINICOMPACT": 0.60
+    }
+
+    fuel_boost = {
+        "X": 1.00,  # regular gasoline
+        "Z": 0.92,  # premium gasoline
+        "D": 0.98,  # diesel
+        "E": 0.80,  # ethanol
+        "N": 0.70   # natural gas
+    }
+
+    np.random.seed(42)
+    base_demand = 5000
+    emissions_penalty = (df["CO2 Emissions(g/km)"] - df["CO2 Emissions(g/km)"].min()) * 8
+    engine_penalty = df["Engine Size(L)"] * 180
+    cyl_penalty = df["Cylinders"] * 35
+    class_multiplier = df["Vehicle Class"].map(class_boost).fillna(0.90)
+    fuel_multiplier = df["Fuel Type"].map(fuel_boost).fillna(0.90)
+    noise = np.random.normal(0, 250, len(df))
+
+    demand_proxy = (base_demand - emissions_penalty - engine_penalty - cyl_penalty) * class_multiplier * fuel_multiplier + noise
+    df["demand_target"] = np.maximum(150, demand_proxy).round().astype(int)
+
+    print("\nNo real sales column found. Created PROXY demand_target for full pipeline demonstration.")
+
+if "Revenue" in df.columns:
+    df["revenue_target"] = df["Revenue"]
+    print("Using real 'Revenue' as revenue target.")
+else:
+
+    price_base = 18000
+    engine_price = df["Engine Size(L)"] * 4500
+    cyl_price = df["Cylinders"] * 900
+    premium_fuel_price = np.where(df["Fuel Type"] == "Z", 3500, 0)
+    diesel_price = np.where(df["Fuel Type"] == "D", 2500, 0)
+    luxury_class_price = np.where(
+        df["Vehicle Class"].isin(["FULL-SIZE", "MINICOMPACT", "TWO-SEATER", "SUV - STANDARD"]),
+        12000,
+        0
+    )
+    estimated_price = price_base + engine_price + cyl_price + premium_fuel_price + diesel_price + luxury_class_price
+    df["revenue_target"] = (df["demand_target"] * estimated_price).round(2)
+
+    print("No real revenue column found. Created PROXY revenue_target for full pipeline demonstration.")
+
+
+# define features
+
+
+emissions_target = "CO2 Emissions(g/km)"
+demand_target = "demand_target"
+revenue_target = "revenue_target"
+
+feature_cols = [
+    "Engine Size(L)",
+    "Cylinders",
+    "Vehicle Class",
+    "Transmission",
+    "Fuel Type"
+]
+
+X = df[feature_cols].copy()
+y_emissions = df[emissions_target].copy()
+y_demand = df[demand_target].copy()
+y_revenue = df[revenue_target].copy()
+
+numeric_features = ["Engine Size(L)", "Cylinders"]
+categorical_features = ["Vehicle Class", "Transmission", "Fuel Type"]
+
+# train and test splits
+
+X_train_e, X_test_e, y_train_e, y_test_e = train_test_split(
+    X, y_emissions, test_size=0.2, random_state=42
+)
+
+X_train_d, X_test_d, y_train_d, y_test_d = train_test_split(
+    X, y_demand, test_size=0.2, random_state=42
+)
+
+X_train_r, X_test_r, y_train_r, y_test_r = train_test_split(
+    X, y_revenue, test_size=0.2, random_state=42
+)
+
+
+#preprocessing
+
+numeric_preprocessor_basic = Pipeline([
+    ("imputer", SimpleImputer(strategy="median")),
+    ("scaler", StandardScaler())
+])
+
+numeric_preprocessor_poly = Pipeline([
+    ("imputer", SimpleImputer(strategy="median")),
+    ("scaler", StandardScaler()),
+    ("poly", PolynomialFeatures(degree=2, include_bias=False))
+])
+
+categorical_preprocessor = Pipeline([
+    ("imputer", SimpleImputer(strategy="most_frequent")),
+    ("onehot", OneHotEncoder(handle_unknown="ignore"))
+])
+
+preprocessor_basic = ColumnTransformer([
+    ("num", numeric_preprocessor_basic, numeric_features),
+    ("cat", categorical_preprocessor, categorical_features)
+])
+
+preprocessor_poly = ColumnTransformer([
+    ("num", numeric_preprocessor_poly, numeric_features),
+    ("cat", categorical_preprocessor, categorical_features)
+])
+
+
+# model dictionary
+
+def build_model_dict():
+    return {
+        "Linear Regression": Pipeline([
+            ("preprocessor", preprocessor_basic),
+            ("model", LinearRegression())
+        ]),
+
+        "Ridge Regression": Pipeline([
+            ("preprocessor", preprocessor_poly),
+            ("model", RidgeCV(alphas=np.logspace(-3, 3, 50), cv=5))
+        ]),
+
+        "Lasso Regression": Pipeline([
+            ("preprocessor", preprocessor_poly),
+            ("model", LassoCV(alphas=np.logspace(-3, 1, 100), cv=5, random_state=42, max_iter=20000))
+        ]),
+
+        "Random Forest": Pipeline([
+            ("preprocessor", preprocessor_basic),
+            ("model", RandomForestRegressor(
+                n_estimators=300,
+                random_state=42,
+                n_jobs=-1
+            ))
+        ]),
+
+        "Gradient Boosting": Pipeline([
+            ("preprocessor", preprocessor_basic),
+            ("model", GradientBoostingRegressor(random_state=42))
+        ])
+    }
+
+models_emissions = build_model_dict()
+models_demand = build_model_dict()
+models_revenue = build_model_dict()
+
+# evaluation function
+
+def evaluate_models(models_dict, X_train, X_test, y_train, y_test, label):
+    results = []
+    fitted_models = {}
+    predictions = {}
+    cv = KFold(n_splits=5, shuffle=True, random_state=42)
+
+    print("\n" + "="*70)
+    print(f"{label.upper()} MODEL OUTPUTS")
+    print("="*70)
+
+    for model_name, pipeline in models_dict.items():
+        pipeline.fit(X_train, y_train)
+        y_pred = pipeline.predict(X_test)
+
+        rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+        mae = mean_absolute_error(y_test, y_pred)
+        r2 = r2_score(y_test, y_pred)
+
+        cv_rmse_scores = np.sqrt(
+            -cross_val_score(
+                pipeline,
+                X_train,
+                y_train,
+                cv=cv,
+                scoring="neg_mean_squared_error"
+            )
+        )
+
+        cv_rmse_mean = cv_rmse_scores.mean()
+        cv_rmse_std = cv_rmse_scores.std()
+
+        row = {
+            "Technique": model_name,
+            "Test RMSE": round(rmse, 3),
+            "Test MAE": round(mae, 3),
+            "Test R²": round(r2, 4),
+            "CV RMSE Mean": round(cv_rmse_mean, 3),
+            "CV RMSE Std": round(cv_rmse_std, 3)
+        }
+
+        fitted_model = pipeline.named_steps["model"]
+        if model_name == "Ridge Regression":
+            row["Selected Alpha"] = getattr(fitted_model, "alpha_", np.nan)
+        elif model_name == "Lasso Regression":
+            row["Selected Alpha"] = getattr(fitted_model, "alpha_", np.nan)
+            row["Non-zero Coefs"] = int(np.sum(fitted_model.coef_ != 0))
+        else:
+            row["Selected Alpha"] = np.nan
+            row["Non-zero Coefs"] = np.nan
+
+        results.append(row)
+        fitted_models[model_name] = pipeline
+        predictions[model_name] = y_pred
+
+        print(f"\n{model_name}")
+        print(f"  Test RMSE     : {rmse:.3f}")
+        print(f"  Test MAE      : {mae:.3f}")
+        print(f"  Test R²       : {r2:.4f}")
+        print(f"  CV RMSE Mean  : {cv_rmse_mean:.3f}")
+        print(f"  CV RMSE Std   : {cv_rmse_std:.3f}")
+
+        if model_name in ["Ridge Regression", "Lasso Regression"]:
+            print(f"  Selected alpha: {getattr(fitted_model, 'alpha_', np.nan):.6f}")
+
+        if model_name == "Lasso Regression":
+            print(f"  Non-zero coefficients: {int(np.sum(fitted_model.coef_ != 0))}")
+
+    results_df = pd.DataFrame(results).sort_values(by="Test RMSE").reset_index(drop=True)
+    print("\nFINAL COMPARISON TABLE")
+    print(results_df)
+
+    return results_df, fitted_models, predictions
+
+# running the three modelling tasks
+
+emissions_results_df, emissions_fitted, emissions_preds = evaluate_models(
+    models_emissions, X_train_e, X_test_e, y_train_e, y_test_e, "Emissions"
+)
+
+demand_results_df, demand_fitted, demand_preds = evaluate_models(
+    models_demand, X_train_d, X_test_d, y_train_d, y_test_d, "Demand"
+)
+
+revenue_results_df, revenue_fitted, revenue_preds = evaluate_models(
+    models_revenue, X_train_r, X_test_r, y_train_r, y_test_r, "Revenue"
+)
+
+best_emissions_name = emissions_results_df.loc[0, "Technique"]
+best_demand_name = demand_results_df.loc[0, "Technique"]
+best_revenue_name = revenue_results_df.loc[0, "Technique"]
+
+best_emissions_model = emissions_fitted[best_emissions_name]
+best_demand_model = demand_fitted[best_demand_name]
+best_revenue_model = revenue_fitted[best_revenue_name]
+
+print("\n" + "="*70)
+print("BEST MODELS")
+print("="*70)
+print("Best emissions model:", best_emissions_name)
+print("Best demand model:", best_demand_name)
+print("Best revenue model:", best_revenue_name)
+
+# visual outputs
+
+# metric comparison bar charts
+def metric_bar_chart(results_df, title_prefix):
+    for metric in ["Test RMSE", "Test MAE", "Test R²", "CV RMSE Mean"]:
+        plt.figure(figsize=(10, 5))
+        plt.bar(results_df["Technique"], results_df[metric])
+        plt.xticks(rotation=30, ha="right")
+        plt.ylabel(metric)
+        plt.title(f"{title_prefix}: {metric} by Technique")
+        plt.tight_layout()
+        plt.show()
+
+metric_bar_chart(emissions_results_df, "Emissions Model")
+metric_bar_chart(demand_results_df, "Demand Model")
+metric_bar_chart(revenue_results_df, "Revenue Model")
+
+# actual vs predicted scatter for each task using best model
+def actual_vs_pred_plot(y_true, y_pred, title, y_label):
+    plt.figure(figsize=(6, 6))
+    plt.scatter(y_true, y_pred, alpha=0.5)
+    min_val = min(np.min(y_true), np.min(y_pred))
+    max_val = max(np.max(y_true), np.max(y_pred))
+    plt.plot([min_val, max_val], [min_val, max_val], linestyle="--")
+    plt.xlabel(f"Actual {y_label}")
+    plt.ylabel(f"Predicted {y_label}")
+    plt.title(title)
+    plt.tight_layout()
+    plt.show()
+
+actual_vs_pred_plot(
+    y_test_e,
+    best_emissions_model.predict(X_test_e),
+    f"Best Emissions Model: {best_emissions_name}",
+    "CO2 Emissions"
+)
+
+actual_vs_pred_plot(
+    y_test_d,
+    best_demand_model.predict(X_test_d),
+    f"Best Demand Model: {best_demand_name}",
+    "Demand"
+)
+
+actual_vs_pred_plot(
+    y_test_r,
+    best_revenue_model.predict(X_test_r),
+    f"Best Revenue Model: {best_revenue_name}",
+    "Revenue"
+)
+
+#  residual plots
+def residual_plot(y_true, y_pred, title):
+    residuals = y_true - y_pred
+    plt.figure(figsize=(7, 5))
+    plt.scatter(y_pred, residuals, alpha=0.5)
+    plt.axhline(0, linestyle="--")
+    plt.xlabel("Predicted")
+    plt.ylabel("Residual")
+    plt.title(title)
+    plt.tight_layout()
+    plt.show()
+
+residual_plot(
+    y_test_e,
+    best_emissions_model.predict(X_test_e),
+    f"Residual Plot: Best Emissions Model ({best_emissions_name})"
+)
+
+residual_plot(
+    y_test_d,
+    best_demand_model.predict(X_test_d),
+    f"Residual Plot: Best Demand Model ({best_demand_name})"
+)
+
+residual_plot(
+    y_test_r,
+    best_revenue_model.predict(X_test_r),
+    f"Residual Plot: Best Revenue Model ({best_revenue_name})"
+)
+
+# feature importance for best tree-based models
+def plot_tree_feature_importance(best_pipeline, title):
+    model = best_pipeline.named_steps["model"]
+    if hasattr(model, "feature_importances_"):
+        preprocessor = best_pipeline.named_steps["preprocessor"]
+        cat_names = preprocessor.named_transformers_["cat"].named_steps["onehot"].get_feature_names_out(categorical_features)
+        feature_names = numeric_features + list(cat_names)
+        importance_df = pd.DataFrame({
+            "Feature": feature_names,
+            "Importance": model.feature_importances_
+        }).sort_values(by="Importance", ascending=False).head(15)
+
+        plt.figure(figsize=(10, 6))
+        plt.barh(importance_df["Feature"][::-1], importance_df["Importance"][::-1])
+        plt.xlabel("Importance")
+        plt.title(title)
+        plt.tight_layout()
+        plt.show()
+
+        print("\nTop feature importances:")
+        print(importance_df.to_string(index=False))
+
+if best_emissions_name in ["Random Forest", "Gradient Boosting"]:
+    plot_tree_feature_importance(best_emissions_model, f"Feature Importance: Emissions ({best_emissions_name})")
+
+if best_demand_name in ["Random Forest", "Gradient Boosting"]:
+    plot_tree_feature_importance(best_demand_model, f"Feature Importance: Demand ({best_demand_name})")
+
+if best_revenue_name in ["Random Forest", "Gradient Boosting"]:
+    plot_tree_feature_importance(best_revenue_model, f"Feature Importance: Revenue ({best_revenue_name})")
+
+# scenario simulator
+# what if production shifts toward cleaner compact / smaller SUV portfolio?
+
+scenario_mix = {
+    "COMPACT": 0.30,
+    "MID-SIZE": 0.20,
+    "SUV - SMALL": 0.25,
+    "SUBCOMPACT": 0.10,
+    "SUV - STANDARD": 0.10,
+    "TWO-SEATER": 0.05
+}
+
+if abs(sum(scenario_mix.values()) - 1.0) > 1e-6:
+    raise ValueError("Scenario mix shares must sum to 1.0")
+
+scenario_rows = []
+
+for vehicle_class, share in scenario_mix.items():
+    subset = df[df["Vehicle Class"] == vehicle_class].copy()
+    if subset.empty:
+        print(f"Warning: {vehicle_class} not found in dataset. Skipping.")
+        continue
+
+    representative_row = subset.iloc[[0]].copy()
+
+    representative_row["Engine Size(L)"] = subset["Engine Size(L)"].mean()
+    representative_row["Cylinders"] = round(subset["Cylinders"].mean())
+    representative_row["Transmission"] = subset["Transmission"].mode()[0]
+    representative_row["Fuel Type"] = subset["Fuel Type"].mode()[0]
+    representative_row["Vehicle Class"] = vehicle_class
+
+    X_rep = representative_row[feature_cols]
+
+    pred_emissions = float(best_emissions_model.predict(X_rep)[0])
+    pred_demand = float(best_demand_model.predict(X_rep)[0])
+    pred_revenue = float(best_revenue_model.predict(X_rep)[0])
+
+    scenario_rows.append({
+        "Vehicle Class": vehicle_class,
+        "Production Share": share,
+        "Predicted CO2 per Vehicle": pred_emissions,
+        "Predicted Demand": pred_demand,
+        "Predicted Revenue": pred_revenue,
+        "Weighted CO2": pred_emissions * share,
+        "Weighted Demand": pred_demand * share,
+        "Weighted Revenue": pred_revenue * share
+    })
+
+scenario_df = pd.DataFrame(scenario_rows)
+
+print("\n" + "="*70)
+print("SCENARIO SIMULATOR OUTPUT")
+print("="*70)
+print(scenario_df)
+
+fleet_co2 = scenario_df["Weighted CO2"].sum()
+fleet_demand = scenario_df["Weighted Demand"].sum()
+fleet_revenue = scenario_df["Weighted Revenue"].sum()
+
+print("\nScenario summary:")
+print(f"Estimated fleet-average CO2 under scenario: {fleet_co2:.2f} g/km")
+print(f"Estimated fleet-weighted demand under scenario: {fleet_demand:.2f}")
+print(f"Estimated fleet-weighted revenue under scenario: {fleet_revenue:,.2f}")
+
+# Scenario charts
+plt.figure(figsize=(10, 5))
+plt.bar(scenario_df["Vehicle Class"], scenario_df["Predicted CO2 per Vehicle"])
+plt.xticks(rotation=30, ha="right")
+plt.ylabel("Predicted CO2 per Vehicle")
+plt.title("Scenario Simulator: Predicted Emissions by Vehicle Class")
+plt.tight_layout()
+plt.show()
+
+plt.figure(figsize=(10, 5))
+plt.bar(scenario_df["Vehicle Class"], scenario_df["Predicted Demand"])
+plt.xticks(rotation=30, ha="right")
+plt.ylabel("Predicted Demand")
+plt.title("Scenario Simulator: Predicted Demand by Vehicle Class")
+plt.tight_layout()
+plt.show()
+
+plt.figure(figsize=(10, 5))
+plt.bar(scenario_df["Vehicle Class"], scenario_df["Predicted Revenue"])
+plt.xticks(rotation=30, ha="right")
+plt.ylabel("Predicted Revenue")
+plt.title("Scenario Simulator: Predicted Revenue by Vehicle Class")
+plt.tight_layout()
+plt.show()
+
+# output tables
+
+sample_emissions = X_test_e.copy()
+sample_emissions["Actual_CO2"] = y_test_e.values
+sample_emissions["Predicted_CO2"] = best_emissions_model.predict(X_test_e)
+sample_emissions["Residual"] = sample_emissions["Actual_CO2"] - sample_emissions["Predicted_CO2"]
+
+sample_demand = X_test_d.copy()
+sample_demand["Actual_Demand"] = y_test_d.values
+sample_demand["Predicted_Demand"] = best_demand_model.predict(X_test_d)
+sample_demand["Residual"] = sample_demand["Actual_Demand"] - sample_demand["Predicted_Demand"]
+
+sample_revenue = X_test_r.copy()
+sample_revenue["Actual_Revenue"] = y_test_r.values
+sample_revenue["Predicted_Revenue"] = best_revenue_model.predict(X_test_r)
+sample_revenue["Residual"] = sample_revenue["Actual_Revenue"] - sample_revenue["Predicted_Revenue"]
+
+print("\n" + "="*70)
+print("SAMPLE EMISSIONS PREDICTIONS")
+print("="*70)
+print(sample_emissions.head(10).to_string(index=False))
+
+print("\n" + "="*70)
+print("SAMPLE DEMAND PREDICTIONS")
+print("="*70)
+print(sample_demand.head(10).to_string(index=False))
+
+print("\n" + "="*70)
+print("SAMPLE REVENUE PREDICTIONS")
+print("="*70)
+print(sample_revenue.head(10).to_string(index=False))
