@@ -1,0 +1,341 @@
+# due to dashboard size and functions, I had to generate various excel sheets from the CO2 emissions dataset to better help with speed and loading for the dashboard
+
+import os
+import warnings
+warnings.filterwarnings("ignore")
+
+import numpy as np
+import pandas as pd
+
+from sklearn.model_selection import train_test_split, cross_val_score, KFold
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler, PolynomialFeatures
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LinearRegression, RidgeCV, LassoCV
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+
+# config
+
+DATA_FILE = "CO2 Emissions_Canada(1).csv"
+OUTPUT_DIR = "dashboard_outputs"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# data preparation
+
+df = pd.read_csv(DATA_FILE).drop_duplicates().copy()
+
+required_cols = [
+    "Make",
+    "Model",
+    "Vehicle Class",
+    "Engine Size(L)",
+    "Cylinders",
+    "Transmission",
+    "Fuel Type",
+    "CO2 Emissions(g/km)"
+]
+
+missing_required = [col for col in required_cols if col not in df.columns]
+if missing_required:
+    raise ValueError(f"Missing required columns: {missing_required}")
+
+df = df[required_cols].dropna().copy()
+
+df["vehicle_key"] = (
+    df["Vehicle Class"].astype(str) + "_" +
+    df["Fuel Type"].astype(str) + "_" +
+    df["Transmission"].astype(str) + "_" +
+    pd.cut(
+        df["Engine Size(L)"],
+        bins=[0, 1.5, 2.5, 3.5, 5.0, 10.0],
+        labels=["small", "medium", "large", "xlarge", "performance"]
+    ).astype(str)
+)
+
+# Proxy demand
+class_boost = {
+    "COMPACT": 1.20,
+    "MID-SIZE": 1.10,
+    "SUBCOMPACT": 1.05,
+    "SUV - SMALL": 1.15,
+    "SUV - STANDARD": 0.95,
+    "FULL-SIZE": 0.85,
+    "PICKUP TRUCK - SMALL": 0.90,
+    "PICKUP TRUCK - STANDARD": 0.88,
+    "MINIVAN": 0.92,
+    "TWO-SEATER": 0.55,
+    "STATION WAGON - SMALL": 0.95,
+    "STATION WAGON - MID-SIZE": 0.88,
+    "VAN - CARGO": 0.72,
+    "VAN - PASSENGER": 0.78,
+    "MINICOMPACT": 0.60
+}
+
+fuel_boost = {
+    "X": 1.00,
+    "Z": 0.92,
+    "D": 0.98,
+    "E": 0.80,
+    "N": 0.70
+}
+
+np.random.seed(42)
+base_demand = 5000
+emissions_penalty = (df["CO2 Emissions(g/km)"] - df["CO2 Emissions(g/km)"].min()) * 8
+engine_penalty = df["Engine Size(L)"] * 180
+cyl_penalty = df["Cylinders"] * 35
+class_multiplier = df["Vehicle Class"].map(class_boost).fillna(0.90)
+fuel_multiplier = df["Fuel Type"].map(fuel_boost).fillna(0.90)
+noise = np.random.normal(0, 250, len(df))
+
+demand_proxy = (
+    (base_demand - emissions_penalty - engine_penalty - cyl_penalty)
+    * class_multiplier
+    * fuel_multiplier
+    + noise
+)
+df["demand_target"] = np.maximum(150, demand_proxy).round().astype(int)
+
+# Proxy revenue
+price_base = 18000
+engine_price = df["Engine Size(L)"] * 4500
+cyl_price = df["Cylinders"] * 900
+premium_fuel_price = np.where(df["Fuel Type"] == "Z", 3500, 0)
+diesel_price = np.where(df["Fuel Type"] == "D", 2500, 0)
+luxury_class_price = np.where(
+    df["Vehicle Class"].isin(["FULL-SIZE", "MINICOMPACT", "TWO-SEATER", "SUV - STANDARD"]),
+    12000,
+    0
+)
+estimated_price = (
+    price_base + engine_price + cyl_price +
+    premium_fuel_price + diesel_price + luxury_class_price
+)
+df["revenue_target"] = (df["demand_target"] * estimated_price).round(2)
+
+# Save cleaned data for overview tab
+df.to_csv(os.path.join(OUTPUT_DIR, "cleaned_data.csv"), index=False)
+
+# ============================================================
+# MODELLING SETUP
+# ============================================================
+
+feature_cols = [
+    "Engine Size(L)",
+    "Cylinders",
+    "Vehicle Class",
+    "Transmission",
+    "Fuel Type"
+]
+
+numeric_features = ["Engine Size(L)", "Cylinders"]
+categorical_features = ["Vehicle Class", "Transmission", "Fuel Type"]
+
+numeric_preprocessor_basic = Pipeline([
+    ("imputer", SimpleImputer(strategy="median")),
+    ("scaler", StandardScaler())
+])
+
+numeric_preprocessor_poly = Pipeline([
+    ("imputer", SimpleImputer(strategy="median")),
+    ("scaler", StandardScaler()),
+    ("poly", PolynomialFeatures(degree=2, include_bias=False))
+])
+
+categorical_preprocessor = Pipeline([
+    ("imputer", SimpleImputer(strategy="most_frequent")),
+    ("onehot", OneHotEncoder(handle_unknown="ignore"))
+])
+
+preprocessor_basic = ColumnTransformer([
+    ("num", numeric_preprocessor_basic, numeric_features),
+    ("cat", categorical_preprocessor, categorical_features)
+])
+
+preprocessor_poly = ColumnTransformer([
+    ("num", numeric_preprocessor_poly, numeric_features),
+    ("cat", categorical_preprocessor, categorical_features)
+])
+
+def build_model_dict():
+    return {
+        "Linear Regression": Pipeline([
+            ("preprocessor", preprocessor_basic),
+            ("model", LinearRegression())
+        ]),
+        "Ridge Regression": Pipeline([
+            ("preprocessor", preprocessor_poly),
+            ("model", RidgeCV(alphas=np.logspace(-3, 3, 50), cv=5))
+        ]),
+        "Lasso Regression": Pipeline([
+            ("preprocessor", preprocessor_poly),
+            ("model", LassoCV(alphas=np.logspace(-3, 1, 100), cv=5, random_state=42, max_iter=20000))
+        ]),
+        "Random Forest": Pipeline([
+            ("preprocessor", preprocessor_basic),
+            ("model", RandomForestRegressor(
+                n_estimators=300,
+                random_state=42,
+                n_jobs=-1
+            ))
+        ]),
+        "Gradient Boosting": Pipeline([
+            ("preprocessor", preprocessor_basic),
+            ("model", GradientBoostingRegressor(random_state=42))
+        ])
+    }
+
+def get_feature_importance_df(best_pipeline):
+    model = best_pipeline.named_steps["model"]
+    if not hasattr(model, "feature_importances_"):
+        return pd.DataFrame(columns=["Feature", "Importance"])
+
+    preprocessor = best_pipeline.named_steps["preprocessor"]
+    cat_names = preprocessor.named_transformers_["cat"].named_steps["onehot"].get_feature_names_out(categorical_features)
+    feature_names = numeric_features + list(cat_names)
+
+    importance_df = pd.DataFrame({
+        "Feature": feature_names,
+        "Importance": model.feature_importances_
+    }).sort_values(by="Importance", ascending=False).head(15)
+
+    return importance_df
+
+def evaluate_task(target_name, prefix):
+    X = df[feature_cols].copy()
+    y = df[target_name].copy()
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
+
+    models = build_model_dict()
+    results = []
+    fitted_models = {}
+    cv = KFold(n_splits=5, shuffle=True, random_state=42)
+
+    for model_name, pipeline in models.items():
+        pipeline.fit(X_train, y_train)
+        y_pred = pipeline.predict(X_test)
+
+        rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+        mae = mean_absolute_error(y_test, y_pred)
+        r2 = r2_score(y_test, y_pred)
+
+        cv_rmse_scores = np.sqrt(
+            -cross_val_score(
+                pipeline,
+                X_train,
+                y_train,
+                cv=cv,
+                scoring="neg_mean_squared_error"
+            )
+        )
+
+        row = {
+            "Technique": model_name,
+            "Test RMSE": round(float(rmse), 3),
+            "Test MAE": round(float(mae), 3),
+            "Test R²": round(float(r2), 4),
+            "CV RMSE Mean": round(float(cv_rmse_scores.mean()), 3),
+            "CV RMSE Std": round(float(cv_rmse_scores.std()), 3)
+        }
+
+        fitted_model = pipeline.named_steps["model"]
+        if model_name == "Ridge Regression":
+            row["Selected Alpha"] = float(getattr(fitted_model, "alpha_", np.nan))
+        elif model_name == "Lasso Regression":
+            row["Selected Alpha"] = float(getattr(fitted_model, "alpha_", np.nan))
+            row["Non-zero Coefs"] = int(np.sum(fitted_model.coef_ != 0))
+        else:
+            row["Selected Alpha"] = np.nan
+            row["Non-zero Coefs"] = np.nan
+
+        results.append(row)
+        fitted_models[model_name] = pipeline
+
+    results_df = pd.DataFrame(results).sort_values(by="Test RMSE").reset_index(drop=True)
+    best_name = results_df.loc[0, "Technique"]
+    best_model = fitted_models[best_name]
+    best_pred = best_model.predict(X_test)
+
+    sample_df = X_test.copy().reset_index(drop=True)
+    sample_df["Actual"] = y_test.reset_index(drop=True)
+    sample_df["Predicted"] = pd.Series(best_pred)
+    sample_df["Residual"] = sample_df["Actual"] - sample_df["Predicted"]
+    sample_df["Sample Index"] = np.arange(1, len(sample_df) + 1)
+
+    importance_df = get_feature_importance_df(best_model)
+
+    results_df.to_csv(os.path.join(OUTPUT_DIR, f"{prefix}_results.csv"), index=False)
+    sample_df.to_csv(os.path.join(OUTPUT_DIR, f"{prefix}_sample_predictions.csv"), index=False)
+    importance_df.to_csv(os.path.join(OUTPUT_DIR, f"{prefix}_feature_importance.csv"), index=False)
+
+    return best_name, best_model
+
+best_emissions_name, best_emissions_model = evaluate_task("CO2 Emissions(g/km)", "emissions")
+best_demand_name, best_demand_model = evaluate_task("demand_target", "demand")
+best_revenue_name, best_revenue_model = evaluate_task("revenue_target", "revenue")
+
+# scenario outputs
+
+def run_scenario(scenario_mix):
+    scenario_rows = []
+
+    for vehicle_class, share in scenario_mix.items():
+        subset = df[df["Vehicle Class"] == vehicle_class].copy()
+        if subset.empty:
+            continue
+
+        representative_row = subset.iloc[[0]].copy()
+        representative_row["Engine Size(L)"] = subset["Engine Size(L)"].mean()
+        representative_row["Cylinders"] = round(subset["Cylinders"].mean())
+        representative_row["Transmission"] = subset["Transmission"].mode()[0]
+        representative_row["Fuel Type"] = subset["Fuel Type"].mode()[0]
+        representative_row["Vehicle Class"] = vehicle_class
+
+        X_rep = representative_row[feature_cols]
+
+        pred_emissions = float(best_emissions_model.predict(X_rep)[0])
+        pred_demand = float(best_demand_model.predict(X_rep)[0])
+        pred_revenue = float(best_revenue_model.predict(X_rep)[0])
+
+        scenario_rows.append({
+            "Vehicle Class": vehicle_class,
+            "Production Share": share,
+            "Predicted CO2 per Vehicle": pred_emissions,
+            "Predicted Demand": pred_demand,
+            "Predicted Revenue": pred_revenue,
+            "Weighted CO2": pred_emissions * share,
+            "Weighted Demand": pred_demand * share,
+            "Weighted Revenue": pred_revenue * share
+        })
+
+    scenario_df = pd.DataFrame(scenario_rows)
+    return scenario_df
+
+default_scenario_mix = {
+    "COMPACT": 0.30,
+    "MID-SIZE": 0.20,
+    "SUV - SMALL": 0.25,
+    "SUBCOMPACT": 0.10,
+    "SUV - STANDARD": 0.10,
+    "TWO-SEATER": 0.05
+}
+
+scenario_df = run_scenario(default_scenario_mix)
+scenario_df.to_csv(os.path.join(OUTPUT_DIR, "scenario_results.csv"), index=False)
+
+summary_df = pd.DataFrame([{
+    "best_emissions_model": best_emissions_name,
+    "best_demand_model": best_demand_name,
+    "best_revenue_model": best_revenue_name,
+    "fleet_average_co2": float(scenario_df["Weighted CO2"].sum()),
+    "fleet_weighted_demand": float(scenario_df["Weighted Demand"].sum()),
+    "fleet_weighted_revenue": float(scenario_df["Weighted Revenue"].sum())
+}])
+summary_df.to_csv(os.path.join(OUTPUT_DIR, "summary_metrics.csv"), index=False)
+
+print("All dashboard output files saved in:", OUTPUT_DIR)
