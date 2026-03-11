@@ -1,6 +1,7 @@
 Vehicle Emissions, Demand, and Revenue Dashboard
 
 Link to dashboard: https://gjeddesedzrnx2vjjwve8s.streamlit.app/     
+Link to resources for cost and sell of vehicles: https://www150.statcan.gc.ca/n1/daily-quotidien/250815/dq250815d-eng.htm and https://www150.statcan.gc.ca/n1/en/catalogue/63-007-X
 
 Folder Structure
 
