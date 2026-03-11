@@ -54,7 +54,8 @@ df["vehicle_key"] = (
     ).astype(str)
 )
 
-# Proxy demand
+# proxy demand
+
 class_boost = {
     "COMPACT": 1.20,
     "MID-SIZE": 1.10,
@@ -118,9 +119,7 @@ df["revenue_target"] = (df["demand_target"] * estimated_price).round(2)
 # Save cleaned data for overview tab
 df.to_csv(os.path.join(OUTPUT_DIR, "cleaned_data.csv"), index=False)
 
-# ============================================================
-# MODELLING SETUP
-# ============================================================
+# model setup
 
 feature_cols = [
     "Engine Size(L)",
