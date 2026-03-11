@@ -10,20 +10,6 @@ dashboard-data-engineering/
 ├── build_outputs.py
 ├── requirements.txt
 ├── CO2 Emissions_Canada(1).csv
-│
-└── dashboard_outputs/
-    ├── cleaned_data.csv
-    ├── emissions_results.csv
-    ├── demand_results.csv
-    ├── revenue_results.csv
-    ├── emissions_sample_predictions.csv
-    ├── demand_sample_predictions.csv
-    ├── revenue_sample_predictions.csv
-    ├── emissions_feature_importance.csv
-    ├── demand_feature_importance.csv
-    ├── revenue_feature_importance.csv
-    ├── scenario_results.csv
-    └── summary_metrics.csv
 
 Overview
 
