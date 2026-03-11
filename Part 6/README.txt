@@ -11,3 +11,12 @@ This interactive dashboard presents the modelling results developed for the Vehi
 The primary objective of the dashboard is to translate model outputs into a visual decision-support tool. The interface allows users to explore model performance, compare prediction accuracy, and test how different vehicle production mixes affect fleet-level outcomes.
 
 The system therefore moves from vehicle-level engineering attributes to strategic insights for our customers
+
+Key Insights
+
+The modelling results demonstrate that:
+
+• Vehicle engineering characteristics strongly influence emissions outcomes
+• Ensemble machine learning models outperform linear regression approaches
+• Certain vehicle classes can achieve lower emissions while maintaining strong demand
+• Portfolio composition can significantly influence fleet-level environmental performance
