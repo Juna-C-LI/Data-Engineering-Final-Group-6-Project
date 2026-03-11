@@ -2,6 +2,29 @@ Vehicle Emissions, Demand, and Revenue Dashboard
 
 Link to dashboard: https://gjeddesedzrnx2vjjwve8s.streamlit.app/     
 
+Folder Structure
+
+dashboard-data-engineering/
+│
+├── app.py
+├── build_outputs.py
+├── requirements.txt
+├── CO2 Emissions_Canada(1).csv
+│
+└── dashboard_outputs/
+    ├── cleaned_data.csv
+    ├── emissions_results.csv
+    ├── demand_results.csv
+    ├── revenue_results.csv
+    ├── emissions_sample_predictions.csv
+    ├── demand_sample_predictions.csv
+    ├── revenue_sample_predictions.csv
+    ├── emissions_feature_importance.csv
+    ├── demand_feature_importance.csv
+    ├── revenue_feature_importance.csv
+    ├── scenario_results.csv
+    └── summary_metrics.csv
+
 Overview
 
 In part six of our research report, known as our modelling approach, we created an interactive dashboard for researchers and our customers to interact with to better understand the data and results that we are working with.
