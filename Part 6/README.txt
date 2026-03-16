@@ -24,7 +24,7 @@ dashboard-business-model/
     └── underperforming_brands.png
 
 
-Link to dashboard:  
+Link to dashboard:  https://appdashboardpy-2tbiuw39gzr9qttdrbwjzk.streamlit.app/
 
 
 Overview
