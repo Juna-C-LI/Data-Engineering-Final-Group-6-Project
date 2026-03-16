@@ -2,54 +2,103 @@ Vehicle Emissions, Demand, and Revenue Dashboard
 
 Folder Structure
 
-dashboard-data-engineering/
+dashboard-business-model/
 │
-├── app.py
-├── build_outputs.py
+├── streamlit_dashboard.py
+├── business_model.py
 ├── requirements.txt
-├── CO2 Emissions_Canada(1).csv
+├── Canada_JP_SUV_FILLED_FINAL_v2.xlsx
 │
-└── dashboard_outputs/
-    ├── cleaned_data.csv
-    ├── emissions_results.csv
-    ├── demand_results.csv
-    ├── revenue_results.csv
-    ├── emissions_sample_predictions.csv
-    ├── demand_sample_predictions.csv
-    ├── revenue_sample_predictions.csv
-    ├── emissions_feature_importance.csv
-    ├── demand_feature_importance.csv
-    ├── revenue_feature_importance.csv
-    ├── scenario_results.csv
-    └── summary_metrics.csv
+└── business_outputs/
+    ├── executive_kpis.csv
+    ├── japanese_suv_business_model_output.csv
+    ├── brand_summary.csv
+    ├── cluster_profile.csv
+    ├── top10_brand_share.csv
+    ├── top10_business_index.png
+    ├── brand_business_index.png
+    ├── engine_vs_co2.png
+    ├── avg_co2_by_brand.png
+    ├── price_vs_co2_clusters.png
+    ├── cluster_positioning_map.png
+    └── underperforming_brands.png
 
 
-Link to dashboard: https://gjeddesedzrnx2vjjwve8s.streamlit.app/    
+Link to dashboard:  
 
-Link to resources for cost and sell of vehicles: 
-https://www.statcan.gc.ca/en/topics-start/automotive
-https://www150.statcan.gc.ca/n1/daily-quotidien/250815/dq250815d-eng.htm 
-https://www150.statcan.gc.ca/n1/en/catalogue/63-007-X
-https://www.chevrolet.ca/en/suvs/previous-year-trax
-https://thecarboys.ca/best-small-suvs-in-canada/
-https://thecarboys.ca/best-midsize-suvs-canada/
-https://www.devex.com/organizations/statistics-canada-statcan-149189
 
 Overview
 
-In part six of our research report, known as our modelling approach, we created an interactive dashboard for researchers and our customers to interact with to better understand the data and results that we are working with.
+In Part Six of our research report, the modelling approach, we developed an interactive dashboard for customers, researchers, and high-level decision-makers to explore the commercial and environmental performance of Japanese SUV brands in the Canadian market.
 
-This interactive dashboard presents the modelling results developed for the Vehicle Emissions and Scenario Analysis project. The dashboard integrates machine learning models with scenario simulation tools to explore how vehicle engineering characteristics influence environmental performance, market demand, and revenue outcomes.
+This dashboard presents the results of our business-oriented vehicle analysis using the updated Japanese SUV dataset. The dashboard combines business scoring, clustering analysis, and visual portfolio diagnostics to show how price, CO2 emissions, and engine size shape vehicle competitiveness.
 
-The primary objective of the dashboard is to translate model outputs into a visual decision-support tool. The interface allows users to explore model performance, compare prediction accuracy, and test how different vehicle production mixes affect fleet-level outcomes.
+The primary objective of the dashboard is to translate analytical results into a management decision-support tool. Rather than presenting the project as a purely technical modelling exercise, the interface helps users identify the strongest-performing Japanese vehicles, compare brand positioning, and understand why some brands underperform relative to their peers.
 
-The system therefore moves from vehicle-level engineering attributes to strategic insights for our customers
+The system therefore moves from vehicle-level specifications to strategic business insight for customers and stakeholders.
+
+Dashboard Purpose
+
+The dashboard is designed around two audiences.
+
+1. Business customers and high-level stakeholders
+
+These users need concise, visual, decision-focused outputs. For this reason, the dashboard highlights:
+
+Best Japanese car by business index
+
+Lowest CO2 Japanese brand
+
+Most price-competitive brand
+
+Worst underperforming brand
+
+Number of market clusters identified
+
+It also presents portfolio-level visuals that show which brands are strongest, which vehicles offer the best value, and which segments may create commercial or environmental risk.
+
+2. Academic reviewers and professors
+
+These users may want access to the underlying model logic, processed data, clustering outputs, and ranking methodology. For that reason, the dashboard also includes dedicated sections with the cleaned data tables, scoring outputs, brand summaries, and cluster profiles.
 
 Key Insights
 
-The modelling results demonstrate that:
+The modelling results show that:
 
-• Vehicle engineering characteristics strongly influence emissions outcomes
-• Ensemble machine learning models outperform linear regression approaches
-• Certain vehicle classes can achieve lower emissions while maintaining strong demand
-• Portfolio composition can significantly influence fleet-level environmental performance
+Price and CO2 emissions are the most important commercial screening variables in the current business model.
+
+A weighted business index can identify the strongest Japanese SUVs by balancing affordability, lower emissions, and smaller engine size.
+
+KMeans clustering helps explain underperformance by grouping vehicles with similar commercial and environmental characteristics.
+
+Some brands underperform not because of one isolated model, but because of broader portfolio patterns such as higher average CO2, weaker price competitiveness, or larger engine sizes.
+
+Portfolio composition matters. Brand-level performance changes depending on how many vehicles fall into stronger or weaker business clusters.
+
+Dashboard Sections
+Executive KPIs
+
+This section gives a high-level management summary of the strongest and weakest performers in the dataset.
+
+Portfolio Performance
+
+This section shows average business index by brand and brand share within the top-ranked vehicles.
+
+Efficiency and Emissions
+
+This section focuses on engine size, CO2 emissions, and average emissions by brand.
+
+Commercial Competitiveness
+
+This section shows price versus CO2 positioning and the cluster-based market map.
+
+Underperformance Diagnosis
+
+This section identifies likely reasons for weak brand performance, such as high CO2, high price, or large engine size.
+
+Professor Data Room
+
+This section contains the supporting tables, ranking outputs, cluster summaries, and underlying processed data for academic review.
+
+Closing
+The Japanese SUV Business Performance Dashboard was developed as an interactive decision-support tool within the modelling approach section of this project. Using the updated Canadian market dataset, the dashboard evaluates Japanese SUV brands through a business-oriented framework based on price, CO2 emissions, and engine size. A weighted business index is used to rank vehicles, while KMeans clustering is applied to explain why certain brands underperform relative to peers. The dashboard is designed for both business stakeholders and academic reviewers, with executive-level visuals for strategic interpretation and detailed analytical tabs for methodological transparency.
