@@ -96,7 +96,7 @@ Underperformance Diagnosis
 
 This section identifies likely reasons for weak brand performance, such as high CO2, high price, or large engine size.
 
-Professor Data Room
+Data and Support
 
 This section contains the supporting tables, ranking outputs, cluster summaries, and underlying processed data for academic review.
 
