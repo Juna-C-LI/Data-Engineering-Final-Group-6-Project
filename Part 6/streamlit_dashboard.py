@@ -1,4 +1,4 @@
-# this is the dashboard app I created
+# this is the dashboard app
 
 import os
 import numpy as np
