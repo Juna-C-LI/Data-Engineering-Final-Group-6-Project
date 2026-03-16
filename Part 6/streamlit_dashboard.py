@@ -89,9 +89,6 @@ top10_share = results["top10_share"]
 kpis = results["kpis"]
 
 
-# -----------------------------
-# Executive KPI row
-# -----------------------------
 k1, k2, k3, k4, k5 = st.columns(5)
 
 k1.metric(
@@ -125,9 +122,8 @@ k5.metric(
 )
 
 
-# -----------------------------
-# Tabs
-# -----------------------------
+# tabs
+
 exec_tab, portfolio_tab, efficiency_tab, commercial_tab, diagnosis_tab, professor_tab = st.tabs([
     "Executive View",
     "Portfolio Performance",
