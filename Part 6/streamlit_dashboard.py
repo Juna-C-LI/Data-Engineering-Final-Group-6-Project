@@ -124,13 +124,13 @@ k5.metric(
 
 # tabs
 
-exec_tab, portfolio_tab, efficiency_tab, commercial_tab, diagnosis_tab, professor_tab = st.tabs([
+exec_tab, portfolio_tab, efficiency_tab, commercial_tab, diagnosis_tab, data_tab = st.tabs([
     "Executive View",
     "Portfolio Performance",
     "Efficiency and Emissions",
     "Commercial Competitiveness",
     "Underperformance Diagnosis",
-    "Professor Data Room",
+    "Data and Support",
 ])
 
 
