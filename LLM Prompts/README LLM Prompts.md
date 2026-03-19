@@ -24,13 +24,25 @@ All ChatGPT Plus generated outputs were governed by a multi-stage, collaborative
 The team perform line-by-line audits of all LLM-drafted technical narratives. These meetings served as the final judicial authority for architectural decisions, such as overriding LLM-suggested "Streaming" logic in favor of "Batch" processing to better align with the Japanese SUV dataset's characteristics.
 
 #### Quantitative Data Audit and Precision
-* **100% Manual Cross-Reference:** Every coefficient (e.g., Spearman r = -0.624) was traced back to raw Python .csv outputs.
-* **Zero-Delta Threshold:** A strict 0.00 delta threshold was enforced; any rounding variance exceeding two decimal places was manually corrected to ensure mathematical precision.
+* 100% Manual Cross-Reference: Every coefficient (e.g., Spearman r = -0.624) was traced back to raw Python .csv outputs.
+* Zero-Delta Threshold: A strict 0.00 delta threshold was enforced; any rounding variance exceeding two decimal places was manually corrected to ensure mathematical precision.
 
 #### Code Syntax and Logic Refactoring
-* **85% Codebase Refactoring:** LLM-suggested Streamlit scaffolds were refactored for performance, replacing standard loops with vectorized Pandas operations.
-* **Algebraic Verification:** The "Business Index" formula was independently audited to ensure the weighting was applied without algebraic drift.
+* 85% Codebase Refactoring: LLM-suggested Streamlit scaffolds were refactored for performance, replacing standard loops with vectorized Pandas operations.
+* Algebraic Verification: The "Business Index" formula was independently audited to ensure the weighting was applied without algebraic drift.
 
 #### Qualitative Fact-Checking and Simulation Guardrails
-* **Hallucination Purging:** The group identified and removed three instances of LLM-hallucinated hybrid specifications for ICE-only brands, ensuring the report remained an empirical reflection of the 9 Japanese brands in the dataset.
-* **Sensitivity Stress-Testing:** Projected 5-10% emission reductions were stress-tested via manual sensitivity analyses to confirm that the LLM's synthesized narrative remained grounded in mathematical plausibility rather than speculative extrapolation.
+* Hallucination Purging: The group identified and removed three instances of LLM-hallucinated hybrid specifications for ICE-only brands, ensuring the report remained an empirical reflection of the 9 Japanese brands in the dataset.
+* Sensitivity Stress-Testing: Projected 5-10% emission reductions were stress-tested via manual sensitivity analyses to confirm that the LLM's synthesized narrative remained grounded in mathematical plausibility rather than speculative extrapolation.
+
+#### Data Governance
+* We maintained a strict data isolation policy, as no raw metadata or SQL credentials were shared with ChatGPT Plus.
+* We abstracted prompts to focus on logical structures, ensuring that external training data did not "leak" into our localized Canadian market analysis.
+
+#### 6. Algorithmic Bias Mitigation and Ethical Oversight
+* The group actively neutralized inherent pro-hybrid biases in the LLM’s output.
+* We manually re-weighted narratives to ensure an objective engineering audit of ICE efficiencies. We also adjusted the Business Index framing to reflect socio-economic realities of consumer affordability in the Canadian market.
+
+#### 7. Version Control and Prompt Versioning
+* Prompt Engineering was treated as a versioned asset. Each core prompt (E.1–E.4) underwent 5–7 documented iterations, often using other models, but using ChatGPT as our final model.
+* Our prompt registry ensures full traceability, linking the final report’s strategic narrative directly back to the raw computational outputs in the Curated data layer.
