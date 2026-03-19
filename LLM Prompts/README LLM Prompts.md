@@ -39,10 +39,10 @@ The team perform line-by-line audits of all LLM-drafted technical narratives. Th
 * We maintained a strict data isolation policy, as no raw metadata or SQL credentials were shared with ChatGPT Plus.
 * We abstracted prompts to focus on logical structures, ensuring that external training data did not "leak" into our localized Canadian market analysis.
 
-#### 6. Algorithmic Bias Mitigation and Ethical Oversight
+#### Algorithmic Bias Mitigation and Ethical Oversight
 * The group actively neutralized inherent pro-hybrid biases in the LLM’s output.
 * We manually re-weighted narratives to ensure an objective engineering audit of ICE efficiencies. We also adjusted the Business Index framing to reflect socio-economic realities of consumer affordability in the Canadian market.
 
-#### 7. Version Control and Prompt Versioning
+#### Version Control and Prompt Versioning
 * Prompt Engineering was treated as a versioned asset. Each core prompt (E.1–E.4) underwent 5–7 documented iterations, often using other models, but using ChatGPT as our final model.
 * Our prompt registry ensures full traceability, linking the final report’s strategic narrative directly back to the raw computational outputs in the Curated data layer.
